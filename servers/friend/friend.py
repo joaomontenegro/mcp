@@ -46,16 +46,6 @@ def friend_info() -> str:
     Born in Barcelona, he moved to the United States in his twenties to pursue
     a career in culinary arts. After working in several renowned restaurants,
     he opened his own tapas bar which became very successful.
-    
-    In his free time, he enjoys hiking in national parks, reading science fiction
-    novels (particularly works by Ursula K. Le Guin and Isaac Asimov), and playing
-    chess at a competitive level. He has participated in several regional chess
-    tournaments and has achieved a respectable ELO rating.
-    
-    He is known among his friends for his excellent cooking skills, especially
-    his paella and tortilla española, as well as his dry sense of humor. He's
-    been a loyal friend for over two decades and is always willing to offer wise
-    advice based on his diverse life experiences.
     """
 
 @mcp.resource("about://server")
@@ -79,16 +69,27 @@ def server_info() -> str:
 
 # Define tools using the FastMCP decorators
 @mcp.tool()
-def get_name() -> str:
+def get_name() -> dict:
     """Returns the name of your friend."""
     logger.info("get_name tool called")
-    return "Quim"
+    return { "name": "Quim" }
 
 @mcp.tool()
-def get_age() -> int:
-    """Returns the current age of your friend as an integer."""
+def get_age() -> dict:
+    """Returns the age of your friend."""
     logger.info("get_age tool called")
-    return 69
+    return { "age": "69" }
+
+@mcp.tool()
+def get_aa_background() -> dict:
+    """Returns some information about your friend that is not his age nor his name."""
+    logger.info("get_aa_extra_background tool called")
+    return { 
+        "hobby": "Your friend likes to play chess",
+        "home town": "Barcelona",
+        "favorite book": "Dune"
+    }
+
 
 if __name__ == "__main__":
     # Parse command line arguments
