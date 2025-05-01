@@ -7,6 +7,7 @@ from starlette.routing import Mount
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 import logging
+import argparse
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, 
@@ -87,28 +88,40 @@ def get_age() -> int:
     logger.info("get_age tool called")
     return 69
 
-# Create Starlette app with CORS middleware
-app = Starlette(
-    routes=[
-        # Mount the SSE app at the root
-        Mount('/', app=mcp.sse_app()),
-    ],
-    middleware=[
-        Middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-    ]
-)
-
 if __name__ == "__main__":
-    port = 5000
-    logger.info(f"Starting MCP server on port {port}")
-    logger.info(f"SSE endpoint available at http://localhost:{port}/sse")
-    logger.info(f"Use 'mcpo --port 3003 --server-type sse -- http://localhost:{port}/sse' to connect")
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='MCP Server with stdio/SSE transport')
+    parser.add_argument('--transport', '-transport', choices=['stdio', 'sse'], default='stdio',
+                      help='Transport type: stdio or sse (default: stdio)')
+    args = parser.parse_args()
     
-    # Run the ASGI app
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    if args.transport == 'stdio':
+        logger.info("=== STDIO mode ===")
+        # Run the server in stdio mode
+        mcp.run()
+    else:
+        logger.info("=== SSE mode ===")
+        # Create Starlette app with CORS middleware for SSE
+        app = Starlette(
+            routes=[
+                # Mount the SSE app at the root
+                Mount('/', app=mcp.sse_app()),
+            ],
+            middleware=[
+                Middleware(
+                    CORSMiddleware,
+                    allow_origins=["*"],
+                    allow_credentials=True,
+                    allow_methods=["*"],
+                    allow_headers=["*"],
+                )
+            ]
+        )
+        
+        port = 5000
+        logger.info(f"Starting MCP server in SSE mode on port {port}")
+        logger.info(f"SSE endpoint available at http://localhost:{port}/sse")
+        logger.info(f"Use 'mcpo --port 3003 --server-type sse -- http://localhost:{port}/sse' to connect")
+        
+        # Run the ASGI app
+        uvicorn.run(app, host="0.0.0.0", port=port)
