@@ -8,6 +8,8 @@ from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 import logging
 import argparse
+import subprocess
+import sys
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG, 
@@ -93,14 +95,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='MCP Server with stdio/SSE transport')
     parser.add_argument('--transport', '-transport', choices=['stdio', 'sse'], default='stdio',
                       help='Transport type: stdio or sse (default: stdio)')
+    parser.add_argument('--port', '-port', type=int, default=3001,
+                      help='Port for SSE server (default: 3001)')
+    parser.add_argument('--mcpo', '-mcpo', action='store_true',
+                      help='Launch mcpo proxy when running in SSE mode')
+    parser.add_argument('--mcpo-port', type=int, default=3002,
+                      help='Port for mcpo proxy (default: 3002)')
     args = parser.parse_args()
     
     if args.transport == 'stdio':
-        logger.info("=== STDIO mode ===")
+        logger.info("Starting MCP server in stdio mode")
         # Run the server in stdio mode
         mcp.run()
     else:
-        logger.info("=== SSE mode ===")
         # Create Starlette app with CORS middleware for SSE
         app = Starlette(
             routes=[
@@ -118,10 +125,42 @@ if __name__ == "__main__":
             ]
         )
         
-        port = 5000
-        logger.info(f"Starting MCP server in SSE mode on port {port}")
-        logger.info(f"SSE endpoint available at http://localhost:{port}/sse")
-        logger.info(f"Use 'mcpo --port 3003 --server-type sse -- http://localhost:{port}/sse' to connect")
+        logger.info(f"Starting MCP server in SSE mode on port {args.port}")
+        logger.info(f"SSE endpoint available at http://localhost:{args.port}/sse")
+        
+        # If --mcpo is set, launch mcpo in the background
+        mcpo_process = None
+        if args.mcpo:
+            server_url = f"http://localhost:{args.port}/sse"
+            mcpo_command = [
+                "mcpo",
+                "--port", str(args.mcpo_port),
+                "--server-type", "sse",
+                "--cors-allow-origins", "*",
+                "--",
+                server_url
+            ]
+            
+            logger.info(f"Launching mcpo with command: {' '.join(mcpo_command)}")
+            
+            # Start mcpo in the background
+            try:
+                mcpo_process = subprocess.Popen(mcpo_command)
+                logger.info(f"Started mcpo (PID: {mcpo_process.pid})")
+                logger.info(f"mcpo is now available at http://localhost:{args.mcpo_port}")
+            except Exception as e:
+                logger.error(f"Failed to start mcpo: {e}")
+        else:
+            logger.info(f"Use 'mcpo --port {args.mcpo_port} --server-type sse -- http://localhost:{args.port}/sse' to connect")
         
         # Run the ASGI app
-        uvicorn.run(app, host="0.0.0.0", port=port)
+        try:
+            uvicorn.run(app, host="0.0.0.0", port=args.port)
+        finally:
+            # If mcpo was started, terminate it when the server stops
+            if mcpo_process is not None:
+                try:
+                    mcpo_process.terminate()
+                    logger.info("Terminated mcpo process")
+                except:
+                    pass
